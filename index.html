@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="uk" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Система Валідації та Публікації Відгуків</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Іконки -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500;600&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['Fira Code', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .star-rating i {
+            transition: transform 0.15s ease, color 0.15s ease;
+        }
+        .star-rating i:hover {
+            transform: scale(1.25);
+        }
+        /* Custom scrollbar for log viewer */
+        .custom-scroll::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scroll::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.6);
+        }
+        .custom-scroll::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen font-sans antialiased p-4 sm:p-6 lg:p-8 flex flex-col justify-between">
+
+    <div class="max-w-7xl mx-auto w-full space-y-8">
+        
+        <!-- Заголовок сайту -->
+        <header class="text-center space-y-3">
+            <div class="inline-flex items-center justify-center px-4 py-2 bg-indigo-500/10 rounded-full border border-indigo-500/20 text-indigo-400 mb-1">
+                <i class="fa-brands fa-python text-xl mr-2.5"></i>
+                <span class="font-semibold tracking-wide uppercase text-xs sm:text-sm">Python Live Logic Debugger</span>
+            </div>
+            <h1 class="text-3xl sm:text-5xl font-extrabold tracking-tight bg-gradient-to-r from-indigo-400 via-purple-300 to-pink-400 bg-clip-text text-transparent">
+                Валідатор та Монітор Відгуків
+            </h1>
+            <p class="text-slate-400 max-w-2xl mx-auto text-sm sm:text-base">
+                Інтерактивний веб-сервіс, який у реальному часі обробляє текст та перевіряє умови валідності за допомогою Python-логіки.
+            </p>
+        </header>
+
+        <!-- Основна сітка: Форма + Інспектор Python -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            
+            <!-- Секція 1: Форма введення (7 колонок) -->
+            <section class="lg:col-span-7 bg-slate-800/80 backdrop-blur-md rounded-2xl p-6 sm:p-7 border border-slate-700/60 shadow-2xl space-y-6">
+                <div class="flex justify-between items-center border-b border-slate-700/60 pb-4">
+                    <h2 class="text-xl font-bold flex items-center gap-2.5">
+                        <i class="fa-regular fa-pen-to-square text-indigo-400"></i>
+                        Форма відгуку
+                    </h2>
+                    <span id="validation-badge" class="px-3 py-1 text-xs font-semibold rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1.5">
+                        <span id="badge-dot" class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                        <span id="badge-text">Форма валідна</span>
+                    </span>
+                </div>
+
+                <form id="review-form" onsubmit="submitReview(event)" class="space-y-6">
+                    <!-- Текстове поле -->
+                    <div class="space-y-2">
+                        <div class="flex justify-between items-center text-sm">
+                            <label for="review-input" class="font-medium text-slate-300">
+                                Текст відгуку (<code class="text-indigo-300 font-mono text-xs">review</code>):
+                            </label>
+                            <span id="char-counter" class="text-xs font-mono px-2 py-1 rounded-md border border-slate-700 bg-slate-900/60 text-slate-400">
+                                0 / 120 символів
+                            </span>
+                        </div>
+                        <div class="relative">
+                            <textarea 
+                                id="review-input" 
+                                rows="4" 
+                                class="w-full bg-slate-900/90 border border-slate-700 rounded-xl p-3.5 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all resize-none font-sans text-sm sm:text-base"
+                                placeholder="   Введіть свій відгук тут (пробіли по краях автоматично обріжуться)...   "
+                                oninput="updateLogic()"
+                            >   Дуже зручний сервіс!   </textarea>
+                            <button 
+                                type="button" 
+                                onclick="clearInput()" 
+                                class="absolute top-3 right-3 text-slate-500 hover:text-slate-300 text-xs bg-slate-800 hover:bg-slate-700 p-1.5 rounded-lg transition"
+                                title="Очистити поле"
+                            >
+                                <i class="fa-solid fa-xmark"></i>
+                            </button>
+                        </div>
+                        <!-- Індикатор помилки довжини -->
+                        <p id="review-error-msg" class="text-xs text-rose-400 hidden flex items-center gap-1">
+                            <i class="fa-solid fa-circle-exclamation"></i>
+                            Текст відгуку після strip() повинен бути від 1 до 120 символів.
+                        </p>
+                    </div>
+
+                    <!-- Вибір зірочок -->
+                    <div class="space-y-2">
+                        <label class="block text-sm font-medium text-slate-300">
+                            Оцінка (<code class="text-indigo-300 font-mono text-xs">stars</code>):
+                        </label>
+                        <div class="flex items-center justify-between bg-slate-900/60 p-3.5 rounded-xl border border-slate-700/60">
+                            <div class="star-rating flex items-center gap-2 text-2xl sm:text-3xl cursor-pointer" id="star-container">
+                                <i class="fa-solid fa-star text-amber-400" onclick="setStars(1)"></i>
+                                <i class="fa-solid fa-star text-amber-400" onclick="setStars(2)"></i>
+                                <i class="fa-solid fa-star text-amber-400" onclick="setStars(3)"></i>
+                                <i class="fa-solid fa-star text-amber-400" onclick="setStars(4)"></i>
+                                <i class="fa-solid fa-star text-amber-400" onclick="setStars(5)"></i>
+                            </div>
+                            <span id="stars-display-text" class="text-sm font-bold text-amber-400 font-mono bg-amber-400/10 px-3 py-1 rounded-lg border border-amber-400/20">
+                                5 / 5
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Кнопка відправки -->
+                    <button 
+                        type="submit" 
+                        id="submit-btn"
+                        class="w-full py-3.5 px-4 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold rounded-xl shadow-lg shadow-indigo-600/25 transition-all duration-200 flex items-center justify-center gap-2 text-sm sm:text-base"
+                    >
+                        <i class="fa-solid fa-paper-plane"></i>
+                        Опублікувати відгук
+                    </button>
+                </form>
+            </section>
+
+            <!-- Секція 2: Live Python Logic Debugger Panel (5 колонок) -->
+            <section class="lg:col-span-5 bg-slate-950 rounded-2xl p-6 border border-slate-800 shadow-2xl space-y-5">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                    <div class="flex items-center gap-2 text-indigo-400 font-mono text-sm font-semibold">
+                        <i class="fa-solid fa-terminal text-base"></i>
+                        <span>Live Python Inspection</span>
+                    </div>
+                    <span class="flex h-2.5 w-2.5 relative">
+                      <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                    </span>
+                </div>
+
+                <!-- Вихідний код та моніторинг змінних -->
+                <div class="font-mono text-xs sm:text-sm space-y-4">
+                    
+                    <!-- Оригінальний Python код -->
+                    <div class="bg-slate-900/90 p-3.5 rounded-xl border border-slate-800/80 text-slate-300 space-y-1 overflow-x-auto custom-scroll">
+                        <div class="text-slate-500 text-xs font-sans mb-1">// Формули розрахунку:</div>
+                        <div><span class="text-purple-400">clean_review</span> = review.<span class="text-blue-400">strip</span>()</div>
+                        <div><span class="text-purple-400">is_valid_review</span> = 0 &lt; <span class="text-blue-400">len</span>(clean_review) &lt;= <span class="text-amber-400">120</span></div>
+                        <div><span class="text-purple-400">is_valid_stars</span> = 1 &lt;= stars &lt;= <span class="text-amber-400">5</span></div>
+                    </div>
+
+                    <!-- Моніторинг змінних -->
+                    <div class="space-y-3 pt-1">
+                        <!-- raw review -->
+                        <div class="space-y-1">
+                            <span class="text-slate-500 text-xs">review (сирий рядок з пробілами):</span>
+                            <div id="out-review" class="bg-slate-900 p-2.5 rounded-lg border border-slate-800 text-amber-200/90 break-all font-mono">
+                                ""
+                            </div>
+                        </div>
+
+                        <!-- clean_review -->
+                        <div class="space-y-1">
+                            <div class="flex justify-between items-center text-xs text-slate-500">
+                                <span>clean_review:</span>
+                                <span>len = <strong id="out-len" class="text-indigo-400">0</strong></span>
+                            </div>
+                            <div id="out-clean" class="bg-slate-900 p-2.5 rounded-lg border border-slate-800 text-emerald-300 break-all font-mono">
+                                ""
+                            </div>
+                        </div>
+
+                        <!-- Булеві прапорці -->
+                        <div class="grid grid-cols-2 gap-2 pt-1">
+                            <div class="bg-slate-900 p-2.5 rounded-lg border border-slate-800 space-y-1">
+                                <span class="text-slate-400 text-xs block">is_valid_review</span>
+                                <span id="out-valid-review" class="font-bold text-sm block">True</span>
+                            </div>
+                            <div class="bg-slate-900 p-2.5 rounded-lg border border-slate-800 space-y-1">
+                                <span class="text-slate-400 text-xs block">is_valid_stars</span>
+                                <span id="out-valid-stars" class="font-bold text-sm block">True</span>
+                            </div>
+                        </div>
+
+                        <!-- Console Print Output simulation -->
+                        <div class="bg-slate-900 p-3 rounded-xl border border-slate-800/80 space-y-1">
+                            <span class="text-slate-500 text-xs block font-sans">print() Консольний вивід:</span>
+                            <div class="text-xs text-slate-300 space-y-0.5">
+                                <div class="flex items-center justify-between">
+                                    <span>Відгук валідний:</span>
+                                    <span id="print-review-valid" class="font-bold text-emerald-400">True</span>
+                                </div>
+                                <div class="flex items-center justify-between">
+                                    <span>Кількість зірок:</span>
+                                    <span id="print-stars-valid" class="font-bold text-emerald-400">5/5 True</span>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- Секція 3: Список збережених/опублікованих відгуків -->
+        <section class="bg-slate-800/80 backdrop-blur-md rounded-2xl p-6 sm:p-7 border border-slate-700/60 shadow-xl space-y-6">
+            <div class="flex justify-between items-center border-b border-slate-700/60 pb-4">
+                <h2 class="text-xl font-bold flex items-center gap-2.5">
+                    <i class="fa-solid fa-comments text-indigo-400"></i>
+                    Опубліковані відгуки
+                    <span id="reviews-count" class="text-xs bg-indigo-500/20 text-indigo-300 px-2.5 py-0.5 rounded-full border border-indigo-500/30">
+                        2
+                    </span>
+                </h2>
+                <span class="text-xs text-slate-400">Збереження в локальну пам'ять</span>
+            </div>
+
+            <!-- Контейнер для списку -->
+            <div id="reviews-list" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- Картки відгуків будуть рендеритись динамічно через JS -->
+            </div>
+        </section>
+    </div>
+
+    <!-- Підніжжя сайту -->
+    <footer class="text-center text-slate-500 text-xs py-6 mt-8 border-t border-slate-800">
+        <p>Інтерактивний валідатор на основі алгоритму Python 🐍 • Tailwind CSS</p>
+    </footer>
+
+    <!-- Логіка JavaScript -->
+    <script>
+        // Початкові дані
+        let currentStars = 5;
+        let reviewsList = [
+            {
+                id: 1,
+                text: "Дуже зручний сервіс!",
+                stars: 5,
+                date: "Щойно"
+            },
+            {
+                id: 2,
+                text: "Швидка робота та гарний інтерфейс. Все зрозуміло з першого разу.",
+                stars: 4,
+                date: "5 хвилин тому"
+            }
+        ];
+
+        // Ініціалізація сторінки
+        window.onload = function() {
+            setStars(5);
+            updateLogic();
+            renderReviews();
+        };
+
+        // Встановлення кількості зірочок
+        function setStars(count) {
+            currentStars = count;
+            const container = document.getElementById('star-container');
+            const stars = container.querySelectorAll('i');
+            
+            stars.forEach((star, index) => {
+                if (index < count) {
+                    star.className = 'fa-solid fa-star text-amber-400';
+                } else {
+                    star.className = 'fa-regular fa-star text-slate-600';
+                }
+            });
+
+            document.getElementById('stars-display-text').innerText = `${count} / 5`;
+            updateLogic();
+        }
+
+        // Очищення текстового поля
+        function clearInput() {
+            document.getElementById('review-input').value = '';
+            updateLogic();
+        }
+
+        // Основна функція обробки Python-логіки у реальному часі
+        function updateLogic() {
+            // Python: review = ...
+            const review = document.getElementById('review-input').value;
+            
+            // Python: clean_review = review.strip()
+            const clean_review = review.trim();
+            const cleanLen = clean_review.length;
+
+            // Python: stars = ...
+            const stars = currentStars;
+
+            // Python: is_valid_review = 0 < len(clean_review) <= 120
+            const is_valid_review = cleanLen > 0 && cleanLen <= 120;
+
+            // Python: is_valid_stars = 1 <= stars <= 5
+            const is_valid_stars = stars >= 1 && stars <= 5;
+
+            // Загальний статус форми
+            const is_form_valid = is_valid_review && is_valid_stars;
+
+            // --- Оновлення елементів UI ---
+
+            // Текстові лічильники
+            const counterEl = document.getElementById('char-counter');
+            counterEl.innerText = `${cleanLen} / 120 символів`;
+            
+            if (cleanLen > 120) {
+                counterEl.className = 'text-xs font-mono px-2 py-1 rounded-md border border-rose-500/50 bg-rose-500/10 text-rose-400 font-bold';
+                document.getElementById('review-error-msg').classList.remove('hidden');
+            } else if (cleanLen === 0) {
+                counterEl.className = 'text-xs font-mono px-2 py-1 rounded-md border border-slate-700 bg-slate-900/60 text-slate-400';
+                document.getElementById('review-error-msg').classList.add('hidden');
+            } else {
+                counterEl.className = 'text-xs font-mono px-2 py-1 rounded-md border border-emerald-500/30 bg-emerald-500/10 text-emerald-400';
+                document.getElementById('review-error-msg').classList.add('hidden');
+            }
+
+            // Оновлення Python Inspector Output
+            document.getElementById('out-review').innerText = `"${review}"`;
+            document.getElementById('out-clean').innerText = `"${clean_review}"`;
+            document.getElementById('out-len').innerText = cleanLen;
+
+            // Статус is_valid_review
+            const outReviewVal = document.getElementById('out-valid-review');
+            outReviewVal.innerText = is_valid_review ? 'True' : 'False';
+            outReviewVal.className = is_valid_review ? 'font-bold text-sm text-emerald-400' : 'font-bold text-sm text-rose-400';
+
+            // Статус is_valid_stars
+            const outStarsVal = document.getElementById('out-valid-stars');
+            outStarsVal.innerText = is_valid_stars ? 'True' : 'False';
+            outStarsVal.className = is_valid_stars ? 'font-bold text-sm text-emerald-400' : 'font-bold text-sm text-rose-400';
+
+            // Симуляція print()
+            const printReview = document.getElementById('print-review-valid');
+            printReview.innerText = is_valid_review ? 'True' : 'False';
+            printReview.className = is_valid_review ? 'font-bold text-emerald-400' : 'font-bold text-rose-400';
+
+            const printStars = document.getElementById('print-stars-valid');
+            printStars.innerText = `${stars}/5 ${is_valid_stars ? 'True' : 'False'}`;
+            printStars.className = is_valid_stars ? 'font-bold text-emerald-400' : 'font-bold text-rose-400';
+
+            // Оновлення Badge статусу
+            const badge = document.getElementById('validation-badge');
+            const badgeDot = document.getElementById('badge-dot');
+            const badgeText = document.getElementById('badge-text');
+
+            if (is_form_valid) {
+                badge.className = 'px-3 py-1 text-xs font-semibold rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1.5';
+                badgeDot.className = 'w-2 h-2 rounded-full bg-emerald-500 animate-pulse';
+                badgeText.innerText = 'Форма валідна';
+            } else {
+                badge.className = 'px-3 py-1 text-xs font-semibold rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 flex items-center gap-1.5';
+                badgeDot.className = 'w-2 h-2 rounded-full bg-rose-500 animate-pulse';
+                badgeText.innerText = 'Помилка валідації';
+            }
+
+            // Кнопка відправки
+            const submitBtn = document.getElementById('submit-btn');
+            submitBtn.disabled = !is_form_valid;
+        }
+
+        // Публікація нового відгуку
+        function submitReview(event) {
+            event.preventDefault();
+            const reviewInput = document.getElementById('review-input');
+            const cleanText = reviewInput.value.trim();
+
+            if (cleanText.length === 0 || cleanText.length > 120) return;
+
+            const newReview = {
+                id: Date.now(),
+                text: cleanText,
+                stars: currentStars,
+                date: "Щойно"
+            };
+
+            reviewsList.unshift(newReview);
+            renderReviews();
+
+            // Очищаємо текстове поле
+            reviewInput.value = '';
+            setStars(5);
+            updateLogic();
+        }
+
+        // Видалення відгуку зі списку
+        function deleteReview(id) {
+            reviewsList = reviewsList.filter(item => item.id !== id);
+            renderReviews();
+        }
+
+        // Рендеринг картка відгуків
+        function renderReviews() {
+            const listEl = document.getElementById('reviews-list');
+            const countEl = document.getElementById('reviews-count');
+
+            countEl.innerText = reviewsList.length;
+
+            if (reviewsList.length === 0) {
+                listEl.innerHTML = `
+                    <div class="col-span-full py-8 text-center text-slate-500 border border-dashed border-slate-700/60 rounded-xl">
+                        <i class="fa-regular fa-folder-open text-3xl mb-2 block"></i>
+                        Поки немає опублікованих відгуків.
+                    </div>
+                `;
+                return;
+            }
+
+            listEl.innerHTML = reviewsList.map(item => {
+                let starsHtml = '';
+                for (let i = 1; i <= 5; i++) {
+                    if (i <= item.stars) {
+                        starsHtml += '<i class="fa-solid fa-star text-amber-400 text-sm"></i>';
+                    } else {
+                        starsHtml += '<i class="fa-regular fa-star text-slate-600 text-sm"></i>';
+                    }
+                }
+
+                return `
+                    <div class="bg-slate-900/80 border border-slate-700/80 rounded-xl p-4 flex flex-col justify-between space-y-3 shadow-md hover:border-slate-600 transition">
+                        <div class="space-y-2">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-1">
+                                    ${starsHtml}
+                                    <span class="text-xs font-mono text-slate-400 ml-1">(${item.stars}/5)</span>
+                                </div>
+                                <span class="text-xs text-slate-500">${item.date}</span>
+                            </div>
+                            <p class="text-sm text-slate-200 break-words font-sans">
+                                "${escapeHtml(item.text)}"
+                            </p>
+                        </div>
+                        <div class="flex justify-between items-center pt-2 border-t border-slate-800 text-xs">
+                            <span class="text-slate-500 font-mono">len: ${item.text.length} char</span>
+                            <button 
+                                onclick="deleteReview(${item.id})" 
+                                class="text-slate-500 hover:text-rose-400 transition flex items-center gap-1"
+                                title="Видалити"
+                            >
+                                <i class="fa-regular fa-trash-can"></i>
+                                Видалити
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Захист від XSS
+        function escapeHtml(text) {
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return text.replace(/[&<>"']/g, m => map[m]);
+        }
+    </script>
+</body>
+</html>
